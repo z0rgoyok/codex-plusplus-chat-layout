@@ -36,7 +36,7 @@ test("normalizeLayout fills defaults", () => {
     enabled: true,
     offset: 24,
     width: 960,
-    handles: true,
+    handles: false,
   });
 });
 

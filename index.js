@@ -15,7 +15,7 @@ const DEFAULT_LAYOUT = Object.freeze({
   enabled: true,
   offset: 24,
   width: 960,
-  handles: true,
+  handles: false,
 });
 
 const LIMITS = Object.freeze({
@@ -39,7 +39,6 @@ module.exports = {
     state.disposed = true;
     state.observer?.disconnect();
     window.removeEventListener("resize", state.onResize, true);
-    document.removeEventListener("pointerdown", state.onPointerDown, true);
     document.querySelectorAll(`[${TARGET_ATTR}="true"]`).forEach((node) => {
       node.removeAttribute(TARGET_ATTR);
     });
@@ -61,18 +60,11 @@ function startRenderer(self, api) {
     observer: null,
     scheduled: 0,
     onResize: null,
-    onPointerDown: null,
   };
   self._state = state;
 
   state.onResize = () => scheduleApply(state);
-  state.onPointerDown = (event) => {
-    const handle = event.target?.closest?.(`[${ROOT_ATTR}="handle"]`);
-    if (!handle) return;
-    startDrag(state, event, handle.getAttribute("data-kind"));
-  };
 
-  document.addEventListener("pointerdown", state.onPointerDown, true);
   window.addEventListener("resize", state.onResize, true);
   state.observer = new MutationObserver(() => scheduleApply(state));
   state.observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -128,42 +120,6 @@ function writeCss(state) {
       margin-left: var(--codexpp-chat-layout-offset) !important;
       margin-right: auto !important;
       ` : ""}
-    }
-
-    [${ROOT_ATTR}="handles"] {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 2147483000;
-    }
-
-    [${ROOT_ATTR}="handle"] {
-      position: fixed;
-      top: 36vh;
-      width: 12px;
-      height: 112px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--color-token-border, currentColor) 70%, transparent);
-      background: color-mix(in srgb, var(--color-token-main-surface-primary, Canvas) 82%, transparent);
-      box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
-      cursor: ew-resize;
-      pointer-events: auto;
-      opacity: 0.42;
-      transition: opacity 120ms ease, transform 120ms ease;
-    }
-
-    [${ROOT_ATTR}="handle"]:hover,
-    [${ROOT_ATTR}="handle"][data-dragging="true"] {
-      opacity: 0.88;
-      transform: scaleX(1.25);
-    }
-
-    [${ROOT_ATTR}="handle"][data-kind="move"] {
-      left: max(0px, calc(var(--codexpp-chat-layout-offset) - 6px));
-    }
-
-    [${ROOT_ATTR}="handle"][data-kind="width"] {
-      left: calc(var(--codexpp-chat-layout-offset) + var(--codexpp-chat-layout-effective-width) - 6px);
     }
 
     [${ROOT_ATTR}="settings"] {
@@ -325,49 +281,9 @@ function findComposerInputs(root = document) {
 }
 
 function renderHandles(state) {
-  if (!state.layout.enabled || !state.layout.handles) {
-    state.handleLayer?.remove();
-    state.handleLayer = null;
-    return;
-  }
-  if (!state.handleLayer) {
-    const layer = document.createElement("div");
-    layer.setAttribute(ROOT_ATTR, "handles");
-    layer.innerHTML =
-      `<div ${ROOT_ATTR}="handle" data-kind="move" title="Move chat column"></div>` +
-      `<div ${ROOT_ATTR}="handle" data-kind="width" title="Resize chat width"></div>`;
-    document.body.appendChild(layer);
-    state.handleLayer = layer;
-  }
-}
-
-function startDrag(state, event, kind) {
-  if (kind !== "move" && kind !== "width") return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-
-  const handle = event.target.closest(`[${ROOT_ATTR}="handle"]`);
-  handle?.setAttribute("data-dragging", "true");
-
-  const startX = event.clientX;
-  const startLayout = { ...state.layout };
-  const onMove = (moveEvent) => {
-    const delta = moveEvent.clientX - startX;
-    if (kind === "move") {
-      updateLayout(state, { offset: startLayout.offset + delta }, { persist: true });
-    } else {
-      updateLayout(state, { width: startLayout.width + delta }, { persist: true });
-    }
-  };
-  const onUp = () => {
-    handle?.removeAttribute("data-dragging");
-    window.removeEventListener("pointermove", onMove, true);
-    window.removeEventListener("pointerup", onUp, true);
-    window.removeEventListener("pointercancel", onUp, true);
-  };
-  window.addEventListener("pointermove", onMove, true);
-  window.addEventListener("pointerup", onUp, true);
-  window.addEventListener("pointercancel", onUp, true);
+  state.handleLayer?.remove();
+  state.handleLayer = null;
+  document.querySelectorAll(`[${ROOT_ATTR}="handles"], [${ROOT_ATTR}="handle"]`).forEach((node) => node.remove());
 }
 
 function updateLayout(state, patch, options = {}) {
@@ -389,7 +305,6 @@ function renderSettings(root, state) {
     toggleRow(state, "enabled", "Enable layout override", "Apply custom chat alignment and width."),
     numberRow(state, "offset", "Left offset", "Distance from the left edge of the content area.", LIMITS.minOffset, LIMITS.maxOffset),
     numberRow(state, "width", "Content width", "Width of chat messages and composer.", LIMITS.minWidth, LIMITS.maxWidth),
-    toggleRow(state, "handles", "Show drag handles", "Drag the left handle to move; drag the right handle to resize."),
   );
 
   const actions = document.createElement("div");
@@ -467,7 +382,7 @@ function normalizeLayout(value) {
     enabled: raw.enabled !== false,
     offset,
     width,
-    handles: raw.handles !== false,
+    handles: false,
   };
 }
 

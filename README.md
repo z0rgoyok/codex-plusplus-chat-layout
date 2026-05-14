@@ -6,9 +6,6 @@ A [Codex++](https://github.com/b-nnett/codex-plusplus) renderer tweak that moves
 
 - Aligns chat content and composer with a configurable left offset.
 - Lets the content width be configured in settings.
-- Adds two small drag handles while the tweak is enabled:
-  - left handle moves the chat column;
-  - right handle changes the content width.
 - Persists layout values in Codex++ renderer storage.
 
 ## Defaults

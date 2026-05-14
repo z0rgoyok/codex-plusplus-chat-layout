@@ -1,7 +1,7 @@
 {
   "id": "co.z0rgoyok.chat-layout",
   "name": "Chat Layout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minRuntime": "0.1.6",
   "githubRepo": "z0rgoyok/codex-plusplus-chat-layout",
   "description": "Align Codex chat content with a configurable left offset and draggable width.",
