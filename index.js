@@ -26,6 +26,12 @@ const LIMITS = Object.freeze({
   rightGutter: 24,
 });
 
+const ASIDE_SELECTOR = [
+  "aside.pointer-events-auto.relative.flex.overflow-hidden",
+  "aside.pointer-events-auto.relative.flex.overflow-visible",
+  "aside.pointer-events-auto.relative.flex",
+].join(", ");
+
 /** @type {import("@codex-plusplus/sdk").Tweak} */
 module.exports = {
   start(api) {
@@ -38,6 +44,7 @@ module.exports = {
     if (!state) return;
     state.disposed = true;
     state.observer?.disconnect();
+    state.sidebarResizeObserver?.disconnect();
     window.removeEventListener("resize", state.onResize, true);
     document.querySelectorAll(`[${TARGET_ATTR}="true"]`).forEach((node) => {
       node.removeAttribute(TARGET_ATTR);
@@ -58,6 +65,8 @@ function startRenderer(self, api) {
     handleLayer: null,
     pageHandle: null,
     observer: null,
+    sidebarResizeObserver: null,
+    observedSidebar: null,
     scheduled: 0,
     onResize: null,
   };
@@ -98,26 +107,41 @@ function applyLayout(state) {
   if (state.disposed) return;
   state.layout = normalizeLayout(state.layout);
   writeCss(state);
+  trackSidebar(state);
   annotateTargets(state);
   renderHandles(state);
   renderSettings(state.pageRoot, state);
 }
 
+function trackSidebar(state) {
+  const sidebar = findMainSidebar();
+  if (state.observedSidebar === sidebar) return;
+  state.sidebarResizeObserver?.disconnect();
+  state.sidebarResizeObserver = null;
+  state.observedSidebar = sidebar;
+  if (!sidebar || typeof ResizeObserver !== "function") return;
+  state.sidebarResizeObserver = new ResizeObserver(() => scheduleApply(state));
+  state.sidebarResizeObserver.observe(sidebar);
+}
+
 function writeCss(state) {
   const { enabled, offset, width } = state.layout;
-  const maxAvailable = `calc(100vw - ${offset}px - ${LIMITS.rightGutter}px)`;
   state.style.textContent = `
     :root {
       --codexpp-chat-layout-offset: ${offset}px;
       --codexpp-chat-layout-width: ${width}px;
-      --codexpp-chat-layout-effective-width: min(var(--codexpp-chat-layout-width), ${maxAvailable});
     }
 
     [${TARGET_ATTR}="true"] {
       ${enabled ? `
-      width: var(--codexpp-chat-layout-effective-width) !important;
-      max-width: var(--codexpp-chat-layout-effective-width) !important;
-      margin-left: var(--codexpp-chat-layout-offset) !important;
+      --codexpp-chat-layout-target-offset: var(--codexpp-chat-layout-offset);
+      --codexpp-chat-layout-effective-width: min(
+        var(--codexpp-chat-layout-width),
+        calc(100vw - var(--codexpp-chat-layout-target-offset) - ${LIMITS.rightGutter}px)
+      );
+      width: max(${LIMITS.minWidth}px, var(--codexpp-chat-layout-effective-width)) !important;
+      max-width: max(${LIMITS.minWidth}px, var(--codexpp-chat-layout-effective-width)) !important;
+      margin-left: var(--codexpp-chat-layout-target-offset) !important;
       margin-right: auto !important;
       ` : ""}
     }
@@ -194,11 +218,17 @@ function writeCss(state) {
 function annotateTargets(state) {
   document.querySelectorAll(`[${TARGET_ATTR}="true"]`).forEach((node) => {
     node.removeAttribute(TARGET_ATTR);
+    node.style?.removeProperty("--codexpp-chat-layout-target-offset");
   });
   if (!state.layout.enabled) return;
 
+  const sidebarRight = mainSidebarRight();
   for (const node of findLayoutTargets()) {
     node.setAttribute(TARGET_ATTR, "true");
+    node.style.setProperty(
+      "--codexpp-chat-layout-target-offset",
+      `${targetOffsetFor(node, state.layout.offset, sidebarRight)}px`,
+    );
   }
 }
 
@@ -278,6 +308,24 @@ function findComposerInputs(root = document) {
       node.closest("[class*='composer' i]") ||
       node.tagName === "TEXTAREA";
   });
+}
+
+function mainSidebarRight(root = document) {
+  const aside = findMainSidebar(root);
+  if (!(aside instanceof HTMLElement) || !visible(aside)) return 0;
+  const rect = aside.getBoundingClientRect();
+  return Math.max(0, Math.round(rect.right));
+}
+
+function findMainSidebar(root = document) {
+  const aside = root.querySelector?.(ASIDE_SELECTOR);
+  return aside instanceof HTMLElement && visible(aside) ? aside : null;
+}
+
+function targetOffsetFor(node, offset, sidebarRight) {
+  const parentLeft = Math.round(node.parentElement?.getBoundingClientRect?.().left ?? 0);
+  const minOffset = Math.max(0, Math.round(sidebarRight) + Math.round(offset) - parentLeft);
+  return Math.max(Math.round(offset), minOffset);
 }
 
 function renderHandles(state) {
@@ -415,5 +463,6 @@ if (typeof module !== "undefined") {
     clamp,
     compactText,
     looksLikeContentColumn,
+    targetOffsetFor,
   };
 }

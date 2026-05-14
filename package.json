@@ -1,8 +1,8 @@
 {
   "name": "codex-plusplus-chat-layout",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
-  "description": "Codex++ tweak for draggable Codex chat alignment and width.",
+  "description": "Codex++ tweak for configurable Codex chat alignment and width.",
   "scripts": {
     "test": "node --test test/*.test.js"
   }

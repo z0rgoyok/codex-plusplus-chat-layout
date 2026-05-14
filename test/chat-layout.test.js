@@ -87,3 +87,27 @@ test("looksLikeContentColumn rejects full-width shells", () => {
 
   assert.equal(_internals.looksLikeContentColumn(node, rect, 1800), false);
 });
+
+test("targetOffsetFor keeps content outside resized sidebar", () => {
+  const node = {
+    parentElement: {
+      getBoundingClientRect() {
+        return { left: 0 };
+      },
+    },
+  };
+
+  assert.equal(_internals.targetOffsetFor(node, 24, 860), 884);
+});
+
+test("targetOffsetFor keeps configured offset inside main content parents", () => {
+  const node = {
+    parentElement: {
+      getBoundingClientRect() {
+        return { left: 860 };
+      },
+    },
+  };
+
+  assert.equal(_internals.targetOffsetFor(node, 24, 860), 24);
+});
